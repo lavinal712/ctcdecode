@@ -260,7 +260,7 @@ ctc_beam_search_decoder_batch(
         cutoff_prob, cutoff_top_n, blank_id, log_input, ext_scorer)};
   }
   // thread pool
-  ThreadPool pool(num_processes);
+  ThreadPool pool(std::min(num_processes, probs_split.size()));
   // number of samples
   size_t batch_size = probs_split.size();
 
@@ -302,7 +302,7 @@ std::vector<std::vector<std::pair<double, Output>>> ctc_beam_search_decoder_batc
         probs_split[0], static_cast<DecoderState*>(states[0]), is_eos_s[0])};
   }
   // thread pool
-  ThreadPool pool(num_processes);
+  ThreadPool pool(std::min(num_processes, probs_split.size()));
   // number of samples
   size_t batch_size = probs_split.size();
   
