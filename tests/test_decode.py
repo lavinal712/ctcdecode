@@ -63,6 +63,19 @@ class TestDecoders(unittest.TestCase):
         output_str = self.convert_to_string(beam_result[0][0], self.vocab_list, out_seq_len[0][0])
         self.assertEqual(output_str, self.beam_search_result[2])
 
+    def test_probability_and_top_k_pruning(self):
+        probs = torch.tensor([[[0.01, 0.60, 0.30, 0.09]]])
+        for log_input in (False, True):
+            for cutoff, top_k, expected in ((0.85, 4, [1, 2]), (0.85, 1, [1]),
+                                            (1.0, 2, [1, 2]), (1.0, 10, [1, 2, 3])):
+                with self.subTest(log_input=log_input, cutoff=cutoff, top_k=top_k):
+                    decoder = ctcdecode.CTCBeamDecoder(
+                        list("_abc"), beam_width=4, cutoff_prob=cutoff,
+                        cutoff_top_n=top_k, log_probs_input=log_input, num_processes=1,
+                    )
+                    tokens, _, _, lengths = decoder.decode(probs.log() if log_input else probs)
+                    self.assertEqual(tokens[0, lengths[0] > 0, 0].tolist(), expected)
+
     def test_beam_search_decoder_batch(self):
         probs_seq = torch.FloatTensor([self.probs_seq1, self.probs_seq2])
         decoder = ctcdecode.CTCBeamDecoder(
@@ -73,6 +86,13 @@ class TestDecoders(unittest.TestCase):
         output_str2 = self.convert_to_string(beam_results[1][0], self.vocab_list, out_seq_len[1][0])
         self.assertEqual(output_str1, self.beam_search_result[0])
         self.assertEqual(output_str2, self.beam_search_result[1])
+        single = decoder.decode(probs_seq[:1])
+        self.assertTrue(torch.equal(single[3][0], out_seq_len[0]))
+        valid = torch.arange(probs_seq.size(1)) < out_seq_len[0, :, None]
+        self.assertTrue(torch.equal(single[0][0][valid], beam_results[0][valid]))
+        self.assertTrue(torch.equal(single[2][0][valid], timesteps[0][valid]))
+        valid_beams = out_seq_len[0] > 0
+        torch.testing.assert_close(single[1][0][valid_beams], beam_scores[0][valid_beams])
         del decoder
 
     def test_beam_search_decoder_batch_log(self):
@@ -152,8 +172,13 @@ class TestDecoders(unittest.TestCase):
 
         probs_seq = torch.FloatTensor([self.probs_seq2]).log()
 
+        rng_state = torch.get_rng_state()
         beam_results, beam_scores, timesteps, out_seq_len = decoder.decode(probs_seq[:, :2], [state1], [False])
         beam_results, beam_scores, timesteps, out_seq_len = decoder.decode(probs_seq[:, 2:], [state1], [True])
+
+        self.assertEqual(beam_results.dtype, torch.int32)
+        self.assertEqual(timesteps.dtype, torch.int32)
+        self.assertTrue(torch.equal(torch.get_rng_state(), rng_state))
 
         output_str1 = self.convert_to_string(beam_results[0][0], self.vocab_list, out_seq_len[0][0])
         self.assertEqual(output_str1, self.beam_search_result[2])

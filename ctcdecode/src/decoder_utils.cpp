@@ -20,15 +20,16 @@ std::vector<std::pair<size_t, float>> get_pruned_log_probs(
   // pruning of vacobulary
   size_t cutoff_len = prob_step.size();
   if (log_cutoff_prob < 0.0 || cutoff_top_n < cutoff_len) {
-    std::sort(
-        prob_idx.begin(), prob_idx.end(), pair_comp_second_rev<int, double>);
+    std::partial_sort(
+        prob_idx.begin(), prob_idx.begin() + std::min(cutoff_top_n, cutoff_len),
+        prob_idx.end(), pair_comp_second_rev<int, double>);
     if (log_cutoff_prob < 0.0) {
-      double cum_prob = 0.0;
+      double cum_prob = -NUM_FLT_INF;
       cutoff_len = 0;
       for (size_t i = 0; i < prob_idx.size(); ++i) {
         cum_prob = log_sum_exp(cum_prob, log_input ? prob_idx[i].second : log(prob_idx[i].second) );
         cutoff_len += 1;
-        if (cum_prob >= cutoff_prob || cutoff_len >= cutoff_top_n) break;
+        if (cum_prob >= log_cutoff_prob || cutoff_len >= cutoff_top_n) break;
       }
     }else{
       cutoff_len = cutoff_top_n;

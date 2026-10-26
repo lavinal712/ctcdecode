@@ -255,6 +255,10 @@ ctc_beam_search_decoder_batch(
     Scorer *ext_scorer)
 {
   VALID_CHECK_GT(num_processes, 0, "num_processes must be nonnegative!");
+  if (probs_split.size() == 1) {
+    return {ctc_beam_search_decoder(probs_split[0], vocabulary, beam_size,
+        cutoff_prob, cutoff_top_n, blank_id, log_input, ext_scorer)};
+  }
   // thread pool
   ThreadPool pool(num_processes);
   // number of samples
@@ -293,6 +297,10 @@ std::vector<std::vector<std::pair<double, Output>>> ctc_beam_search_decoder_batc
 
 {
   VALID_CHECK_GT(num_processes, 0, "num_processes must be nonnegative!");
+  if (probs_split.size() == 1) {
+    return {ctc_beam_search_decoder_with_given_state(
+        probs_split[0], static_cast<DecoderState*>(states[0]), is_eos_s[0])};
+  }
   // thread pool
   ThreadPool pool(num_processes);
   // number of samples

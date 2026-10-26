@@ -201,8 +201,10 @@ std::pair<torch::Tensor, torch::Tensor> beam_decode_with_given_state(at::Tensor 
         }
         }
     
-    torch::Tensor output_tokens_tensor = torch::randint(1, {batch_results.size(), max_result_size, max_output_tokens_size});
-    torch::Tensor output_timesteps_tensor = torch::randint(1, {batch_results.size(), max_result_size, max_output_tokens_size});
+    torch::Tensor output_tokens_tensor = torch::zeros({batch_results.size(), max_result_size, max_output_tokens_size}, torch::kInt32);
+    torch::Tensor output_timesteps_tensor = torch::zeros({batch_results.size(), max_result_size, max_output_tokens_size}, torch::kInt32);
+    auto tokens_accessor = output_tokens_tensor.accessor<int, 3>();
+    auto timesteps_accessor = output_timesteps_tensor.accessor<int, 3>();
 
 
     auto scores_accessor =  th_scores.accessor<float, 2>();
@@ -217,8 +219,8 @@ std::pair<torch::Tensor, torch::Tensor> beam_decode_with_given_state(at::Tensor 
             std::vector<int> output_tokens = output.tokens;
             std::vector<int> output_timesteps = output.timesteps;
             for (int t = 0; t < output_tokens.size(); ++t) {
-                output_tokens_tensor[b][p][t] =  output_tokens[t]; // fill output tokens
-                output_timesteps_tensor[b][p][t] = output_timesteps[t];
+                tokens_accessor[b][p][t] =  output_tokens[t]; // fill output tokens
+                timesteps_accessor[b][p][t] = output_timesteps[t];
             }
             scores_accessor[b][p] = n_path_result.first;
             out_length_accessor[b][p] = output_tokens.size();
